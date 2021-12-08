@@ -1,0 +1,7 @@
+[azure] 
+51.140.47.254
+51.140.136.152
+
+[azure:vars]
+ansible_ssh_private_key_file=~/.ssh/azure-kp.cer
+ansible_user=josembi
