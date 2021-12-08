@@ -1,0 +1,41 @@
+---
+- name: Install node and npm
+  hosts: 51.140.136.152  # Replica 2
+  tasks:
+    - name: Update apt repo and cache 
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install nodejs and npm
+      apt:
+        pkg:
+          - nodejs
+          - npm
+    - name: Install latest version of nodejs
+      apt:
+        name: nodejs
+        state: latest
+
+- name: Deploy nodejs app
+  hosts: 51.140.136.152
+  tasks:
+    - name: Copy nodejs folder to server
+      copy:
+        src: /Users/apple/Documents/Ansible-Revision/node-app-master/nodejs-app-1.0.0.tgz
+        dest: /home/josembi
+    - name: Unpack nodejs file
+      unarchive:
+        src: /home/josembi/nodejs-app-1.0.0.tgz
+        dest: /home/josembi
+        remote_src: yes
+    - name: Install dependencies
+      npm:
+        path: /home/josembi/package
+    - name: Start application
+      command:
+        chdir: /home/josembi/package/app
+        cmd: node server
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug: msg={{app_status.stdout_lines}}
