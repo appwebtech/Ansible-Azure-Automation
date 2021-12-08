@@ -83,3 +83,65 @@ In the terminal window of the Azure webserver, I see that the server is running.
 
 ![image-5](./images/image-5.png)
 
+The application is fully deployed, only a few tweaks and all should be working as desired.
+
+## Create a Dev User 
+
+I have been running the app as **josembi** with full admin privileges which may not be suitable for someone like a junior developer. Thus I have created a new user **Foo** with non root permissions to execute the deployment. Initially, the application will be run by an admin user as you can see in the **hosts** file, then a new user will be created and he will execute the rest of the configuration and deployment.
+
+```yaml
+---
+- name: Install node and npm
+  hosts: 51.140.136.152  # Replica 2
+  tasks:
+    - name: Update apt repo and cache
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install nodejs and npm
+      apt:
+        pkg:
+          - nodejs
+          - npm
+    - name: Install latest version of nodejs
+      apt:
+        name: nodejs
+        state: latest
+
+- name: Create new Dev user
+  hosts: 51.140.136.152
+  tasks:
+    - name: Create Dev user
+      user:
+        name: foo
+        comment: Foo Ansible User
+        group: admin
+
+- name: Deploy nodejs app
+  hosts: 51.140.136.152
+  become: True
+  become_user:   # Privilege escalation from admin to dev
+  tasks:
+    - name: Copy nodejs folder to server
+      copy:
+        src: /Users/apple/Documents/Ansible-Revision/node-app-master/nodejs-app-1.0.0.tgz
+        dest: /home/foo
+    - name: Unpack nodejs file
+      unarchive:
+        src: /home/foo/nodejs-app-1.0.0.tgz
+        dest: /home/foo
+        remote_src: yes
+    - name: Install dependencies
+      npm:
+        path: /home/foo/package
+    - name: Start application
+      command:
+        chdir: /home/foo/package/app
+        cmd: node server
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug: msg={{app_status.stdout_lines}}
+```
+
+![image-6](./images/image-6.png)
