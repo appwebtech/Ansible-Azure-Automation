@@ -145,3 +145,72 @@ I have been running the app as **josembi** with full admin privileges which may 
 ```
 
 ![image-6](./images/image-6.png)
+
+![image-7](./images/image-7.png)
+
+## Refactoring (Parameterizing) Code
+
+I have refactored the recurring constructs in the code above. I won't pass values as external variables because that way I can't add them in source control. it's possible to add them in an external variables file outside playbook yaml file which I have also done and which by the way I think is the best approach.
+
+Variables inside the yaml file, just after the creation of the new user.
+
+```yaml
+---
+- name: Install node and npm
+  hosts: 51.140.136.152  # Replica 2
+  tasks:
+    - name: Update apt repo and cache
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install nodejs and npm
+      apt:
+        pkg:
+          - nodejs
+          - npm
+    - name: Install latest version of nodejs
+      apt:
+        name: nodejs
+        state: latest
+
+- name: Create new Dev user
+  hosts: 51.140.136.152
+  tasks:
+    - name: Create Dev user
+      user:
+        name: foo
+        comment: Foo Ansible User
+        group: admin
+
+- name: Deploy nodejs app
+  hosts: 51.140.136.152
+  become: True
+  become_user:   # Privilege escalation from admin to dev
+  vars:
+    - location: /Users/apple/Documents/Ansible-Revision/node-app-master
+    - destination: /home/foo
+    - version: 1.0.0
+
+  tasks:
+    - name: Copy nodejs folder to server
+      copy:
+        src: "{{location}}/nodejs-app-{{version}}.tgz"
+        dest: "{{destination}}"
+    - name: Unpack nodejs file
+      unarchive:
+        src: "{{destination}}nodejs-app-1.0.0.tgz"
+        dest: "{{destination}}"
+        remote_src: yes
+
+    - name: Install dependencies
+      npm:
+        path: "{{destination}}/package"
+    - name: Start application
+      command:
+        chdir: "{{destination}}/package/app"
+        cmd: node server
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug: msg={{app_status.stdout_lines}}
+```
